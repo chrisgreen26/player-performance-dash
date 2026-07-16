@@ -1,0 +1,8 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(python _schema_check2.py)",
+      "Bash(npm --version)"
+    ]
+  }
+}
