@@ -35,6 +35,8 @@ interface PlayerGameRow {
   timeSlot: string;
   homeTeam: boolean;
   margin: number;
+  teamScore: number;
+  oppositionScore: number;
   position: string;
   minsPlayed: number;
   performanceScore: number;
@@ -84,6 +86,7 @@ async function main() {
       ms.match_timeslot AS time_slot,
       ts.home_team,
       ts.margin,
+      ts.score AS team_score,
       ps.position,
       ps.mins_played,
       ps.performance_score,
@@ -110,6 +113,8 @@ async function main() {
     timeSlot: r.time_slot,
     homeTeam: r.home_team,
     margin: r.margin,
+    teamScore: r.team_score,
+    oppositionScore: r.team_score - r.margin,
     position: r.position,
     minsPlayed: r.mins_played,
     performanceScore: r.performance_score,
@@ -132,14 +137,28 @@ async function main() {
   const nrlwCount = games.filter((g) => g.competition === "NRLW").length;
   console.log(`  NRL rows: ${nrlCount}  NRLW rows: ${nrlwCount}`);
 
+  // The player *selector* is scoped to rl.lineups — the current/most recent
+  // named teamlists — rather than every player who's ever appeared in
+  // player_stats. This keeps the dropdown to currently-relevant players
+  // instead of 1,100+ historical names. player-games.json itself stays
+  // un-scoped (full history for every player) since the Opponent side needs
+  // the complete sample regardless of who's selectable in the dropdown.
+  console.log("\n=== Fetching lineup-relevant player ids (rl.lineups) ===");
+  const lineupsResult = await client.query(`SELECT DISTINCT playerid FROM rl.lineups`);
+  const lineupPlayerIds: number[] = lineupsResult.rows.map((r) => r.playerid);
+  console.log(`  ${lineupPlayerIds.length} distinct playerids in rl.lineups`);
+
   console.log("\n=== Fetching player reference data ===");
-  const playerIds = [...new Set(games.map((g) => g.playerId))];
   const playersResult = await client.query(`
     SELECT playerid AS player_id, player_fullname AS full_name, head_img AS head_img
     FROM rl.players
     WHERE playerid = ANY($1::bigint[])
-  `, [playerIds]);
-  console.log(`  ${playersResult.rows.length} distinct players (of ${playerIds.length} ids requested)`);
+  `, [lineupPlayerIds]);
+  console.log(`  ${playersResult.rows.length} distinct players (of ${lineupPlayerIds.length} lineup ids requested)`);
+  const unmatchedLineupIds = lineupPlayerIds.length - playersResult.rows.length;
+  if (unmatchedLineupIds > 0) {
+    console.log(`  ${unmatchedLineupIds} lineup id(s) had no matching rl.players row (skipped — no name to show)`);
+  }
   const malformedImgCount = playersResult.rows.filter((r) => r.head_img && /^https?:https?:/.test(r.head_img)).length;
   if (malformedImgCount > 0) {
     console.log(`  normalized ${malformedImgCount} malformed double-protocol head_img URL(s)`);
@@ -157,12 +176,25 @@ async function main() {
     if (!counts || counts.size === 0) return "Interchange";
     return [...counts.entries()].sort((a, b) => b[1] - a[1])[0][0];
   }
+  const lineupPlayersWithNoHistory = playersResult.rows.filter((r) => !positionCountsByPlayer.has(r.player_id)).length;
+  if (lineupPlayersWithNoHistory > 0) {
+    console.log(`  ${lineupPlayersWithNoHistory} lineup player(s) have no game history in the exported window (likely debutants)`);
+  }
 
   // Source data has a recurring double-protocol bug (e.g. "https:http://host/...")
   // affecting ~48% of head_img values — normalize to a single https:// scheme.
+  //
+  // Separately, club-website-hosted headshots (Sitecore CMS, e.g. contentassets/
+  // SysSiteAssets paths on *.com.au club domains) only render correctly with a
+  // preset=player-profile-small param appended — without it the image 404s/fails.
+  // rugbyimages.statsperform.com (the majority host) doesn't need or use this.
   function normalizeImgUrl(url: string | null): string | null {
     if (!url) return null;
-    return url.replace(/^https?:(?:https?:)?\/\//, "https://");
+    let normalized = url.replace(/^https?:(?:https?:)?\/\//, "https://");
+    if (!normalized.includes("statsperform.com") && !normalized.includes("preset=")) {
+      normalized += (normalized.includes("?") ? "&" : "?") + "preset=player-profile-small";
+    }
+    return normalized;
   }
 
   const players = playersResult.rows.map((r) => ({

@@ -28,6 +28,8 @@ export interface PlayerGameRow {
   timeSlot: TimeSlot;
   homeTeam: boolean;
   margin: number;
+  teamScore: number;
+  oppositionScore: number;
   position: Position;
   minsPlayed: number;
   performanceScore: number;

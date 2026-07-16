@@ -3,9 +3,16 @@
 import { useMemo, useState } from "react";
 import { useDashboardData } from "@/hooks/useDashboardData";
 import { useFilteredData } from "@/hooks/useFilteredData";
-import type { Competition, FilterState, PlayerGameRow, PlayerRef, TeamRef } from "@/lib/types";
+import type { Competition, DatasetMeta, FilterState, PlayerGameRow, PlayerRef, TeamRef } from "@/lib/types";
+import { clampRange, computeRangeBounds, positionsPlayed, type RangeBounds } from "@/lib/aggregate";
+import { pluralizePosition, POSITIONS } from "@/lib/constants";
 import { DashboardLayout } from "@/components/layout/DashboardLayout";
-import { FilterBar } from "@/components/filters/FilterBar";
+import { DashboardSection } from "@/components/layout/DashboardSection";
+import { PositionSelect } from "@/components/filters/PositionSelect";
+import { OpponentSelect } from "@/components/filters/OpponentSelect";
+import { BookmakerLineInput } from "@/components/filters/BookmakerLineInput";
+import { FiltersMenu } from "@/components/filters/FiltersMenu";
+import { PlayerSelector } from "@/components/player/PlayerSelector";
 import { PlayerPanel } from "@/components/player/PlayerPanel";
 import { OpponentPanel } from "@/components/opponent/OpponentPanel";
 import { StackedScoreBarChart } from "@/components/charts/StackedScoreBarChart";
@@ -14,22 +21,21 @@ const EMPTY_GAMES: PlayerGameRow[] = [];
 const EMPTY_MAP = new Map<number, PlayerGameRow[]>();
 const EMPTY_PLAYERS: PlayerRef[] = [];
 const EMPTY_TEAMS: TeamRef[] = [];
+const DEFAULT_COMPETITION: Competition = "NRL";
 
-const FALLBACK_FILTERS: FilterState = {
-  playerId: null,
-  opponentTeamId: null,
-  position: "Fullback",
-  seasonRange: [2023, 2026],
-  minsRange: [0, 80],
-  timeSlot: "all",
-  homeAway: "all",
-  marginRange: [-80, 80],
-  bookmakerLine: 35,
+const FALLBACK_META: DatasetMeta = {
+  generatedAt: "",
+  rowCount: 0,
+  seasons: { min: 2023, max: 2026 },
+  minutesRange: { min: 0, max: 80 },
+  marginRange: { min: -80, max: 80 },
+  defaultPosition: "Fullback",
+  medianPerformanceScore: 35,
 };
 
 export function DashboardClient() {
   const dataState = useDashboardData();
-  const [competition, setCompetition] = useState<Competition>("NRL");
+  const [filtersOpen, setFiltersOpen] = useState(false);
   // Only user-driven overrides live in state; unset fields fall back to
   // dataset-derived defaults computed below, so no effect is needed to
   // "initialize" filters once the async data arrives.
@@ -38,13 +44,14 @@ export function DashboardClient() {
   const ready = dataState.status === "ready";
   const games = ready ? dataState.data.games : EMPTY_GAMES;
   const gamesByPlayer = ready ? dataState.data.gamesByPlayer : EMPTY_MAP;
+  // TODO: once the export script joins rl.lineups, this narrows to
+  // currently-relevant players instead of every player who's ever appeared.
   const allPlayers = ready ? dataState.data.reference.players : EMPTY_PLAYERS;
   const allTeams = ready ? dataState.data.reference.teams : EMPTY_TEAMS;
+  const meta = ready ? dataState.data.reference.meta : FALLBACK_META;
 
-  const defaultFilters: FilterState = useMemo(() => {
-    if (!ready) return FALLBACK_FILTERS;
-    const meta = dataState.data.reference.meta;
-    return {
+  const defaultFilters: FilterState = useMemo(
+    () => ({
       playerId: null,
       opponentTeamId: null,
       position: meta.defaultPosition,
@@ -54,20 +61,48 @@ export function DashboardClient() {
       homeAway: "all",
       marginRange: [meta.marginRange.min, meta.marginRange.max],
       bookmakerLine: meta.medianPerformanceScore,
-    };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [ready]);
+    }),
+    [meta]
+  );
 
   const filters: FilterState = { ...defaultFilters, ...overrides };
 
-  const playersInCompetition = useMemo(
-    () => allPlayers.filter((p) => gamesByPlayer.get(p.playerId)?.some((r) => r.competition === competition)),
-    [allPlayers, gamesByPlayer, competition]
-  );
+  // No visible NRL/NRLW toggle — competition is derived from whichever
+  // player is selected (a player only ever appears in one competition),
+  // defaulting to NRL when no player is picked yet.
+  const competition: Competition = useMemo(() => {
+    if (filters.playerId !== null) {
+      const rows = gamesByPlayer.get(filters.playerId);
+      if (rows && rows.length > 0) return rows[0].competition;
+    }
+    return DEFAULT_COMPETITION;
+  }, [filters.playerId, gamesByPlayer]);
+
   const teamsInCompetition = useMemo(
     () => allTeams.filter((t) => t.competition === competition),
     [allTeams, competition]
   );
+  const teamAbbById = useMemo(() => new Map(allTeams.map((t) => [t.teamId, t.teamAbb])), [allTeams]);
+
+  // Position options narrow to what the selected player has actually played
+  // (in their competition) — no point offering "Prop" for a halfback.
+  const availablePositions = useMemo(() => {
+    if (filters.playerId === null) return POSITIONS;
+    const rows = gamesByPlayer.get(filters.playerId) ?? [];
+    const played = positionsPlayed(rows);
+    return played.length > 0 ? played : POSITIONS;
+  }, [filters.playerId, gamesByPlayer]);
+
+  // Season/minutes/margin slider bounds narrow to the selected player's own
+  // career span — no point showing a 2023 floor for someone who debuted in 2025.
+  const activeBounds: RangeBounds = useMemo(() => {
+    if (filters.playerId !== null) {
+      const rows = gamesByPlayer.get(filters.playerId) ?? [];
+      const playerBounds = computeRangeBounds(rows);
+      if (playerBounds) return playerBounds;
+    }
+    return { seasons: meta.seasons, minutes: meta.minutesRange, margin: meta.marginRange };
+  }, [filters.playerId, gamesByPlayer, meta]);
 
   const { player, opponent } = useFilteredData(games, filters, competition);
 
@@ -75,17 +110,24 @@ export function DashboardClient() {
     setOverrides((o) => ({ ...o, ...patch }));
   }
 
-  function handleCompetitionChange(next: Competition) {
-    setCompetition(next);
-    const playerValid =
-      filters.playerId !== null && gamesByPlayer.get(filters.playerId)?.some((r) => r.competition === next);
+  function handleSelectPlayer(playerId: number) {
+    const rows = gamesByPlayer.get(playerId) ?? [];
+    const newCompetition = rows[0]?.competition ?? DEFAULT_COMPETITION;
+    const topPosition = positionsPlayed(rows)[0] ?? defaultFilters.position;
+    const bounds = computeRangeBounds(rows);
     const opponentValid =
       filters.opponentTeamId !== null &&
-      allTeams.some((t) => t.teamId === filters.opponentTeamId && t.competition === next);
+      allTeams.some((t) => t.teamId === filters.opponentTeamId && t.competition === newCompetition);
     setOverrides((o) => ({
       ...o,
-      playerId: playerValid ? filters.playerId : null,
+      playerId,
+      position: topPosition,
       opponentTeamId: opponentValid ? filters.opponentTeamId : null,
+      ...(bounds && {
+        seasonRange: clampRange(filters.seasonRange, bounds.seasons),
+        minsRange: clampRange(filters.minsRange, bounds.minutes),
+        marginRange: clampRange(filters.marginRange, bounds.margin),
+      }),
     }));
   }
 
@@ -103,51 +145,105 @@ export function DashboardClient() {
     );
   }
 
-  const meta = dataState.data.reference.meta;
   const selectedOpponentTeam = teamsInCompetition.find((t) => t.teamId === filters.opponentTeamId) ?? null;
+  const selectedPlayer = allPlayers.find((p) => p.playerId === filters.playerId) ?? null;
+  const hasPlayer = filters.playerId !== null;
 
   return (
     <DashboardLayout
-      filters={
-        <FilterBar
-          competition={competition}
-          onCompetitionChange={handleCompetitionChange}
-          filters={filters}
-          onFiltersChange={handleFiltersChange}
-          teams={teamsInCompetition}
-          meta={meta}
-        />
+      header={
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+          <h1 className="text-lg font-bold text-gray-900 dark:text-gray-50">Player Performance Dashboard</h1>
+          <div className="flex flex-wrap items-center gap-3">
+            <OpponentSelect
+              teams={teamsInCompetition}
+              value={filters.opponentTeamId}
+              onChange={(opponentTeamId) => handleFiltersChange({ opponentTeamId })}
+            />
+            <BookmakerLineInput
+              value={filters.bookmakerLine}
+              onChange={(bookmakerLine) => handleFiltersChange({ bookmakerLine })}
+            />
+            <button
+              type="button"
+              onClick={() => setFiltersOpen((o) => !o)}
+              className="rounded-md border border-gray-300 bg-white px-3 py-1.5 text-sm font-medium text-gray-700 hover:bg-gray-100 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-200 dark:hover:bg-gray-800"
+            >
+              Filters {filtersOpen ? "▴" : "▾"}
+            </button>
+          </div>
+        </div>
       }
-      panels={
-        <>
+      primarySelection={
+        <div className={`grid grid-cols-1 gap-4 ${hasPlayer ? "sm:grid-cols-2" : ""}`}>
+          <PlayerSelector players={allPlayers} selectedPlayerId={filters.playerId} onSelect={handleSelectPlayer} />
+          {hasPlayer && (
+            <PositionSelect
+              options={availablePositions}
+              value={filters.position}
+              onChange={(position) => handleFiltersChange({ position })}
+            />
+          )}
+        </div>
+      }
+      filtersPanel={
+        filtersOpen ? (
+          <FiltersMenu filters={filters} onFiltersChange={handleFiltersChange} bounds={activeBounds} />
+        ) : null
+      }
+    >
+      <DashboardSection
+        panel={
           <PlayerPanel
-            players={playersInCompetition}
-            selectedPlayerId={filters.playerId}
-            onSelectPlayer={(playerId) => handleFiltersChange({ playerId })}
+            player={selectedPlayer}
             gamesPlayed={player.gamesPlayed}
             avgScore={player.avgScore}
+            avgMinutes={player.avgMinutes}
+            avgMargin={player.avgMargin}
             pctAtOrAboveLine={player.pctAtOrAboveLine}
-            minutesByRound={player.minutesByRound}
-            marginByRound={player.marginByRound}
           />
+        }
+        chart={
+          <StackedScoreBarChart
+            data={player.stackedScoreByRound}
+            title="Player Performance Score Breakdown"
+            teamAbbById={teamAbbById}
+            bookmakerLine={filters.bookmakerLine}
+            emptyMessage={
+              filters.playerId === null
+                ? "Select a player above to see their score breakdown."
+                : "No games match the current filters."
+            }
+          />
+        }
+      />
+      <DashboardSection
+        panel={
           <OpponentPanel
             opponent={selectedOpponentTeam}
+            position={filters.position}
             gamesPlayed={opponent.gamesPlayed}
             avgScoreConceded={opponent.avgScoreConceded}
+            avgMinutes={opponent.avgMinutes}
+            avgMargin={opponent.avgMargin}
             pctAtOrAboveLine={opponent.pctAtOrAboveLine}
-            marginByRound={opponent.marginByRound}
           />
-        </>
-      }
-      charts={
-        <>
-          <StackedScoreBarChart data={player.stackedScoreByRound} title="Player Performance Score Breakdown" />
+        }
+        chart={
           <StackedScoreBarChart
             data={opponent.stackedScoreByRound}
-            title={`Opponent Conceded Score Breakdown vs ${filters.position}`}
+            title={`Opponent Conceded Score Breakdown vs ${pluralizePosition(filters.position)}`}
+            teamAbbById={teamAbbById}
+            variant="opponent"
+            bookmakerLine={filters.bookmakerLine}
+            emptyMessage={
+              filters.opponentTeamId === null
+                ? "Select an opponent to see their conceded score breakdown."
+                : "No games match the current filters."
+            }
           />
-        </>
-      }
-    />
+        }
+      />
+    </DashboardLayout>
   );
 }

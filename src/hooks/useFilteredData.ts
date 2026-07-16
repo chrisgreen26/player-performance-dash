@@ -4,10 +4,11 @@ import { useMemo } from "react";
 import type { Competition, FilterState, PlayerGameRow } from "@/lib/types";
 import { getOpponentPanelRows, getPlayerPanelRows } from "@/lib/filters";
 import {
+  avgMargin,
+  avgMinutes,
   avgPerformanceScore,
   gamesPlayed,
   pctAtOrAboveLine,
-  toRoundValueSeries,
   toStackedScoreSeries,
 } from "@/lib/aggregate";
 
@@ -30,9 +31,9 @@ export function useFilteredData(
       rows: playerRows,
       gamesPlayed: gamesPlayed(playerRows),
       avgScore: avgPerformanceScore(playerRows),
+      avgMinutes: avgMinutes(playerRows),
+      avgMargin: avgMargin(playerRows),
       pctAtOrAboveLine: pctAtOrAboveLine(playerRows, filters.bookmakerLine),
-      minutesByRound: toRoundValueSeries(playerRows, (r) => r.minsPlayed),
-      marginByRound: toRoundValueSeries(playerRows, (r) => r.margin),
       stackedScoreByRound: toStackedScoreSeries(playerRows),
     }),
     [playerRows, filters.bookmakerLine]
@@ -43,8 +44,9 @@ export function useFilteredData(
       rows: opponentRows,
       gamesPlayed: gamesPlayed(opponentRows),
       avgScoreConceded: avgPerformanceScore(opponentRows),
+      avgMinutes: avgMinutes(opponentRows),
+      avgMargin: avgMargin(opponentRows),
       pctAtOrAboveLine: pctAtOrAboveLine(opponentRows, filters.bookmakerLine),
-      marginByRound: toRoundValueSeries(opponentRows, (r) => r.margin),
       stackedScoreByRound: toStackedScoreSeries(opponentRows),
     }),
     [opponentRows, filters.bookmakerLine]

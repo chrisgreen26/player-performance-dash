@@ -31,22 +31,25 @@ export function PlayerSelector({
       <button
         type="button"
         onClick={() => setOpen((o) => !o)}
-        className="flex w-full items-center gap-3 rounded-lg border border-gray-300 bg-white px-3 py-2 text-left dark:border-gray-700 dark:bg-gray-900"
+        className="flex w-full items-center gap-3 rounded-lg border-2 border-gray-300 bg-white px-4 py-3 text-left shadow-sm hover:border-blue-400 dark:border-gray-700 dark:bg-gray-900"
       >
         {selected?.headImg ? (
+          // key forces a fresh DOM node per player so a previous broken-image
+          // state (set via onError below) never leaks onto the next selection
           // eslint-disable-next-line @next/next/no-img-element
           <img
+            key={selected.playerId}
             src={selected.headImg}
             alt=""
-            className="h-9 w-9 rounded-full object-cover bg-gray-100"
+            className="h-12 w-12 rounded-full object-cover bg-gray-100"
             onError={(e) => {
               (e.target as HTMLImageElement).style.visibility = "hidden";
             }}
           />
         ) : (
-          <div className="h-9 w-9 rounded-full bg-gray-200 dark:bg-gray-700" />
+          <div className="h-12 w-12 rounded-full bg-gray-200 dark:bg-gray-700" />
         )}
-        <span className="flex-1 text-sm font-medium text-gray-900 dark:text-gray-100">
+        <span className="flex-1 text-base font-semibold text-gray-900 dark:text-gray-100">
           {selected ? selected.fullName : "Select a player…"}
         </span>
         <span className="text-gray-400">▾</span>

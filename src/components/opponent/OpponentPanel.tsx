@@ -1,43 +1,48 @@
 "use client";
 
 import { PerformanceGauge } from "@/components/charts/PerformanceGauge";
-import { RoundBarChart } from "@/components/charts/RoundBarChart";
-import type { RoundValuePoint } from "@/lib/aggregate";
-import type { TeamRef } from "@/lib/types";
+import { pluralizePosition } from "@/lib/constants";
+import type { Position, TeamRef } from "@/lib/types";
 
 export function OpponentPanel({
   opponent,
+  position,
   gamesPlayed,
   avgScoreConceded,
+  avgMinutes,
+  avgMargin,
   pctAtOrAboveLine,
-  marginByRound,
 }: {
   opponent: TeamRef | null;
+  position: Position;
   gamesPlayed: number;
   avgScoreConceded: number | null;
+  avgMinutes: number | null;
+  avgMargin: number | null;
   pctAtOrAboveLine: number | null;
-  marginByRound: RoundValuePoint[];
 }) {
   return (
-    <div className="rounded-xl border border-teal-300 bg-teal-50 p-4 dark:border-teal-800 dark:bg-teal-950/40">
-      <h2 className="text-sm font-semibold text-teal-800 dark:text-teal-200">
-        {opponent ? `${opponent.teamName} (Conceded vs Position)` : "Opponent"}
-      </h2>
-
+    <div className="flex h-full flex-col rounded-xl border border-teal-300 bg-teal-50 p-4 dark:border-teal-800 dark:bg-teal-950/40">
       {opponent === null ? (
-        <div className="flex h-40 items-center justify-center text-sm text-teal-700/60 dark:text-teal-300/60">
-          Select an opponent
+        <div className="flex flex-1 items-center justify-center text-sm text-teal-700/60 dark:text-teal-300/60">
+          Select an opponent above
         </div>
       ) : (
-        <div className="mt-4 flex flex-col gap-4">
-          <div className="flex items-center justify-around">
+        <div className="flex flex-1 flex-col justify-between gap-4">
+          <h2 className="text-sm font-semibold text-teal-800 dark:text-teal-200">
+            {opponent.teamShortName} vs {pluralizePosition(position)}
+          </h2>
+          <div className="grid grid-cols-2 gap-3">
             <Stat label="Games" value={String(gamesPlayed)} />
             <Stat label="Avg Score Conceded" value={avgScoreConceded === null ? "—" : avgScoreConceded.toFixed(1)} />
           </div>
           <div className="flex justify-center">
-            <PerformanceGauge value={pctAtOrAboveLine} label="% Games Conceding Line" accentColor="#0d9488" />
+            <PerformanceGauge value={pctAtOrAboveLine} label="% Games Conceding Line" size={124} />
           </div>
-          <RoundBarChart data={marginByRound} title="Opponent Margin by Round" color="#0d9488" />
+          <div className="grid grid-cols-2 gap-3">
+            <Stat label="Avg Minutes" value={avgMinutes === null ? "—" : avgMinutes.toFixed(0)} />
+            <Stat label="Avg Margin" value={avgMargin === null ? "—" : avgMargin.toFixed(1)} />
+          </div>
         </div>
       )}
     </div>
@@ -46,9 +51,9 @@ export function OpponentPanel({
 
 function Stat({ label, value }: { label: string; value: string }) {
   return (
-    <div className="text-center">
-      <div className="text-xl font-bold text-teal-900 dark:text-teal-100">{value}</div>
-      <div className="text-xs text-teal-700 dark:text-teal-300">{label}</div>
+    <div className="rounded-lg bg-white/60 px-3 py-3 text-center dark:bg-teal-900/30">
+      <div className="text-2xl font-bold text-teal-900 dark:text-teal-100">{value}</div>
+      <div className="mt-1 text-xs font-medium uppercase tracking-wide text-teal-700 dark:text-teal-300">{label}</div>
     </div>
   );
 }
