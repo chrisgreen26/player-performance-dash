@@ -12,7 +12,7 @@ export function PositionSelect({
   onChange: (value: Position) => void;
 }) {
   return (
-    <div className="inline-flex flex-wrap items-center gap-0.5 self-start justify-self-start rounded-lg border border-gray-300 bg-white p-0.5 dark:border-gray-700 dark:bg-gray-900">
+    <div className="inline-flex flex-wrap items-center gap-0.5 rounded-lg border border-gray-300 bg-white p-0.5 dark:border-gray-700 dark:bg-gray-900">
       {options.map((pos) => (
         <button
           key={pos}

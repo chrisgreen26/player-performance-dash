@@ -1,6 +1,6 @@
 "use client";
 
-import { TIME_SLOTS, TIME_SLOT_TOOLTIP } from "@/lib/constants";
+import { TIME_SLOT_INFO, TIME_SLOTS } from "@/lib/constants";
 import type { TimeSlot } from "@/lib/types";
 import { InfoTooltip } from "@/components/layout/InfoTooltip";
 
@@ -15,7 +15,18 @@ export function TimeSlotSelect({
     <div className="flex flex-col gap-1.5">
       <label htmlFor="timeslot-select" className="flex items-center gap-1 text-xs font-medium text-gray-600 dark:text-gray-300">
         Time Slot
-        <InfoTooltip text={TIME_SLOT_TOOLTIP} />
+        <InfoTooltip
+          content={
+            <div className="flex flex-col gap-1">
+              {TIME_SLOT_INFO.map((t) => (
+                <div key={t.label} className="flex items-center justify-between gap-3">
+                  <span className="font-semibold">{t.label}</span>
+                  <span className="text-gray-300">{t.range}</span>
+                </div>
+              ))}
+            </div>
+          }
+        />
       </label>
       <select
         id="timeslot-select"

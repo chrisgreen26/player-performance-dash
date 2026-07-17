@@ -35,21 +35,24 @@ interface ScoreTooltipProps {
   active?: boolean;
   payload?: { payload: StackedScorePoint }[];
   teamAbbById: Map<number, string>;
+  playerNames?: Record<number, string>;
   colors: { base: string; attack: string; attackStroke: string };
 }
 
-function ScoreTooltip({ active, payload, teamAbbById, colors }: ScoreTooltipProps) {
+function ScoreTooltip({ active, payload, teamAbbById, playerNames, colors }: ScoreTooltipProps) {
   if (!active || !payload || payload.length === 0) return null;
   const point = payload[0].payload;
   const ownAbb = teamAbbById.get(point.teamId) ?? "???";
   const oppAbb = teamAbbById.get(point.oppositionTeamId) ?? "???";
   const separator = point.homeTeam ? "vs" : "@";
+  const playerName = playerNames?.[point.playerId];
 
   return (
     <div className="rounded-md border border-gray-200 bg-white p-2.5 text-xs shadow-lg dark:border-gray-700 dark:bg-gray-900">
       <div className="font-semibold text-gray-900 dark:text-gray-100">
         {point.fixtureLabel} {ownAbb} {separator} {oppAbb} ({point.timeSlot.toUpperCase()})
       </div>
+      {playerName && <div className="text-gray-600 dark:text-gray-300">{playerName}</div>}
       <div className="mb-1.5 text-gray-500 dark:text-gray-400">
         {point.teamScore}-{point.oppositionScore} · {Math.round(point.minsPlayed)} mins
       </div>
@@ -90,6 +93,7 @@ export function StackedScoreBarChart({
   data,
   title,
   teamAbbById,
+  playerNames,
   variant = "player",
   bookmakerLine,
   emptyMessage = "No games match the current filters.",
@@ -97,6 +101,7 @@ export function StackedScoreBarChart({
   data: StackedScorePoint[];
   title: string;
   teamAbbById: Map<number, string>;
+  playerNames?: Record<number, string>;
   variant?: Variant;
   bookmakerLine?: number;
   emptyMessage?: string;
@@ -140,7 +145,7 @@ export function StackedScoreBarChart({
                 <CartesianGrid strokeDasharray="3 3" vertical={false} className="stroke-gray-100 dark:stroke-gray-800" />
                 <XAxis dataKey="label" tick={{ fontSize: 11 }} interval={0} angle={-45} textAnchor="end" height={50} />
                 <YAxis tick={{ fontSize: 11 }} />
-                <Tooltip content={<ScoreTooltip teamAbbById={teamAbbById} colors={colors} />} />
+                <Tooltip content={<ScoreTooltip teamAbbById={teamAbbById} playerNames={playerNames} colors={colors} />} />
                 {bookmakerLine !== undefined && (
                   <ReferenceLine y={bookmakerLine} stroke={BOOKMAKER_LINE_COLOR} strokeDasharray="6 4" strokeWidth={1.5} />
                 )}

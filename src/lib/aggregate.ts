@@ -46,6 +46,7 @@ export interface StackedScorePoint {
   fixtureLabel: string;
   base: number;
   attack: number;
+  playerId: number;
   teamId: number;
   oppositionTeamId: number;
   homeTeam: boolean;
@@ -62,6 +63,7 @@ export function toStackedScoreSeries(rows: PlayerGameRow[]): StackedScorePoint[]
     fixtureLabel: fixtureRoundLabel(r),
     base: r.baseScore,
     attack: r.attackScore,
+    playerId: r.playerId,
     teamId: r.teamId,
     oppositionTeamId: r.oppositionTeamId,
     homeTeam: r.homeTeam,

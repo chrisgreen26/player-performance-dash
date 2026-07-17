@@ -144,8 +144,11 @@ async function main() {
   // un-scoped (full history for every player) since the Opponent side needs
   // the complete sample regardless of who's selectable in the dropdown.
   console.log("\n=== Fetching lineup-relevant player ids (rl.lineups) ===");
-  const lineupsResult = await client.query(`SELECT DISTINCT playerid FROM rl.lineups`);
+  const lineupsResult = await client.query(`SELECT playerid, opposition_team_id FROM rl.lineups`);
   const lineupPlayerIds: number[] = lineupsResult.rows.map((r) => r.playerid);
+  const opponentByPlayerId = new Map<number, number>(
+    lineupsResult.rows.map((r) => [r.playerid, r.opposition_team_id])
+  );
   console.log(`  ${lineupPlayerIds.length} distinct playerids in rl.lineups`);
 
   console.log("\n=== Fetching player reference data ===");
@@ -202,6 +205,7 @@ async function main() {
     fullName: r.full_name,
     headImg: normalizeImgUrl(r.head_img),
     primaryPosition: modePosition(positionCountsByPlayer.get(r.player_id)),
+    defaultOpponentTeamId: opponentByPlayerId.get(r.player_id) ?? null,
   }));
 
   console.log("\n=== Fetching team reference data (NRL + NRLW only) ===");
@@ -219,6 +223,23 @@ async function main() {
     competition: (r.comp_id === 111 ? "NRL" : "NRLW") as Competition,
   }));
   console.log(`  ${teams.length} teams (NRL: ${teams.filter((t) => t.competition === "NRL").length}, NRLW: ${teams.filter((t) => t.competition === "NRLW").length})`);
+
+  // Full-name lookup for every player who appears in player-games.json —
+  // deliberately broader than the lineup-scoped `players` list above, so the
+  // opponent chart's tooltip can name whoever posted a given conceded score
+  // even if that player isn't on a current teamlist (retired, benched, etc).
+  console.log("\n=== Fetching player name lookup (all players appearing in games) ===");
+  const distinctGamePlayerIds = [...new Set(games.map((g) => g.playerId))];
+  const namesResult = await client.query(`
+    SELECT playerid AS player_id, player_fullname AS full_name
+    FROM rl.players
+    WHERE playerid = ANY($1::bigint[])
+  `, [distinctGamePlayerIds]);
+  const playerNames: Record<number, string> = {};
+  for (const r of namesResult.rows) {
+    playerNames[r.player_id] = r.full_name;
+  }
+  console.log(`  ${namesResult.rows.length} names (of ${distinctGamePlayerIds.length} distinct playerIds in games)`);
 
   console.log("\n=== Computing dataset meta ===");
   const seasons = games.map((g) => g.season);
@@ -259,7 +280,7 @@ async function main() {
   const referencePath = path.join(outDir, "reference.json");
 
   writeFileSync(gamesPath, JSON.stringify(games));
-  writeFileSync(referencePath, JSON.stringify({ players, teams, meta }, null, 2));
+  writeFileSync(referencePath, JSON.stringify({ players, teams, meta, playerNames }, null, 2));
 
   const sizeMb = (p: string) => (statSync(p).size / (1024 * 1024)).toFixed(2);
   console.log(`\n=== Wrote files ===`);

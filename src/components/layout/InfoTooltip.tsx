@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 
-export function InfoTooltip({ text }: { text: string }) {
+export function InfoTooltip({ content }: { content: React.ReactNode }) {
   const [open, setOpen] = useState(false);
 
   return (
@@ -18,8 +18,8 @@ export function InfoTooltip({ text }: { text: string }) {
         i
       </button>
       {open && (
-        <span className="absolute bottom-full left-1/2 z-20 mb-2 w-56 -translate-x-1/2 rounded-md bg-gray-900 p-2 text-xs text-white shadow-lg">
-          {text}
+        <span className="absolute bottom-full left-1/2 z-20 mb-2 w-48 -translate-x-1/2 rounded-md bg-gray-900 p-2 text-xs text-white shadow-lg">
+          {content}
         </span>
       )}
     </span>

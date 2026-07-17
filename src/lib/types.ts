@@ -47,6 +47,8 @@ export interface PlayerRef {
    * against each row's own `position`.
    */
   primaryPosition: Position;
+  /** This week's named opposition, from rl.lineups. Null if not currently listed. */
+  defaultOpponentTeamId: number | null;
 }
 
 export interface TeamRef {
@@ -71,6 +73,13 @@ export interface ReferenceData {
   players: PlayerRef[];
   teams: TeamRef[];
   meta: DatasetMeta;
+  /**
+   * Full name lookup for every playerId appearing in player-games.json —
+   * deliberately broader than `players` (which is scoped to rl.lineups),
+   * so tooltips can name whoever posted a given opponent-conceded score
+   * even if that player isn't in the current teamlists.
+   */
+  playerNames: Record<number, string>;
 }
 
 export interface FilterState {

@@ -29,7 +29,7 @@ export function OpponentPanel({
         </div>
       ) : (
         <div className="flex flex-1 flex-col justify-between gap-4">
-          <h2 className="text-sm font-semibold text-teal-800 dark:text-teal-200">
+          <h2 className="text-center text-sm font-semibold text-teal-800 dark:text-teal-200">
             {opponent.teamShortName} vs {pluralizePosition(position)}
           </h2>
           <div className="grid grid-cols-2 gap-3">

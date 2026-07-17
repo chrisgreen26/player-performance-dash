@@ -21,8 +21,11 @@ export const TIME_SLOTS: { value: TimeSlot; label: string }[] = [
   { value: "twilight", label: "Twilight" },
 ];
 
-export const TIME_SLOT_TOOLTIP =
-  "Based on kickoff time — Day: before 4:05pm. Twilight: 4:05pm–7:00pm. Night: after 7:00pm.";
+export const TIME_SLOT_INFO: { label: string; range: string }[] = [
+  { label: "Day", range: "< 4:05pm" },
+  { label: "Twilight", range: "4:05pm – 7:00pm" },
+  { label: "Night", range: "> 7:00pm" },
+];
 
 export const BASE_SCORE_COLOR = "#3b82f6"; // blue
 // Spec calls this "white" — literal white with a visible stroke so the segment

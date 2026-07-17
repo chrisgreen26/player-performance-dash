@@ -4,7 +4,7 @@ import { useMemo, useState } from "react";
 import { useDashboardData } from "@/hooks/useDashboardData";
 import { useFilteredData } from "@/hooks/useFilteredData";
 import type { Competition, DatasetMeta, FilterState, PlayerGameRow, PlayerRef, TeamRef } from "@/lib/types";
-import { clampRange, computeRangeBounds, positionsPlayed, type RangeBounds } from "@/lib/aggregate";
+import { computeRangeBounds, positionsPlayed, type RangeBounds } from "@/lib/aggregate";
 import { pluralizePosition, POSITIONS } from "@/lib/constants";
 import { DashboardLayout } from "@/components/layout/DashboardLayout";
 import { DashboardSection } from "@/components/layout/DashboardSection";
@@ -22,6 +22,7 @@ const EMPTY_GAMES: PlayerGameRow[] = [];
 const EMPTY_MAP = new Map<number, PlayerGameRow[]>();
 const EMPTY_PLAYERS: PlayerRef[] = [];
 const EMPTY_TEAMS: TeamRef[] = [];
+const EMPTY_PLAYER_NAMES: Record<number, string> = {};
 const DEFAULT_COMPETITION: Competition = "NRL";
 
 const FALLBACK_META: DatasetMeta = {
@@ -48,6 +49,7 @@ export function DashboardClient() {
   const allPlayers = ready ? dataState.data.reference.players : EMPTY_PLAYERS;
   const allTeams = ready ? dataState.data.reference.teams : EMPTY_TEAMS;
   const meta = ready ? dataState.data.reference.meta : FALLBACK_META;
+  const playerNames = ready ? dataState.data.reference.playerNames : EMPTY_PLAYER_NAMES;
 
   const defaultFilters: FilterState = useMemo(
     () => ({
@@ -109,24 +111,35 @@ export function DashboardClient() {
     setOverrides((o) => ({ ...o, ...patch }));
   }
 
+  // Switching players resets every filter back to that player's own defaults
+  // rather than carrying the previous player's selections over — stats
+  // scoped to the wrong opponent/season/time-slot are easy to misread as
+  // this player's real numbers, so a clean slate per player is safer.
+  // Bookmaker line is preserved: it's a manual comparison threshold, not a
+  // filter, and staying fixed while browsing players is the whole point of it.
   function handleSelectPlayer(playerId: number) {
     const rows = gamesByPlayer.get(playerId) ?? [];
-    const newCompetition = rows[0]?.competition ?? DEFAULT_COMPETITION;
     const topPosition = positionsPlayed(rows)[0] ?? defaultFilters.position;
     const bounds = computeRangeBounds(rows);
-    const opponentValid =
-      filters.opponentTeamId !== null &&
-      allTeams.some((t) => t.teamId === filters.opponentTeamId && t.competition === newCompetition);
+    // Pre-fill the Opponent panel with this week's named opposition
+    // (rl.lineups), when the player is currently rostered and that team is
+    // one we recognize — otherwise leave it for the user to pick.
+    const player = allPlayers.find((p) => p.playerId === playerId);
+    const lineupOpponent = player?.defaultOpponentTeamId ?? null;
+    const opponentTeamId =
+      lineupOpponent !== null && allTeams.some((t) => t.teamId === lineupOpponent) ? lineupOpponent : null;
     setOverrides((o) => ({
-      ...o,
       playerId,
       position: topPosition,
-      opponentTeamId: opponentValid ? filters.opponentTeamId : null,
+      opponentTeamId,
+      timeSlot: "all",
+      homeAway: "all",
       ...(bounds && {
-        seasonRange: clampRange(filters.seasonRange, bounds.seasons),
-        minsRange: clampRange(filters.minsRange, bounds.minutes),
-        marginRange: clampRange(filters.marginRange, bounds.margin),
+        seasonRange: [bounds.seasons.min, bounds.seasons.max] as [number, number],
+        minsRange: [bounds.minutes.min, bounds.minutes.max] as [number, number],
+        marginRange: [bounds.margin.min, bounds.margin.max] as [number, number],
       }),
+      ...(o.bookmakerLine !== undefined && { bookmakerLine: o.bookmakerLine }),
     }));
   }
 
@@ -240,8 +253,9 @@ export function DashboardClient() {
         chart={
           <StackedScoreBarChart
             data={opponent.stackedScoreByRound}
-            title={`Opponent Conceded Score Breakdown vs ${pluralizePosition(filters.position)}`}
+            title={`${selectedOpponentTeam?.teamShortName ?? "Opponent"} Conceded v ${pluralizePosition(filters.position)}`}
             teamAbbById={teamAbbById}
+            playerNames={playerNames}
             variant="opponent"
             bookmakerLine={filters.bookmakerLine}
             emptyMessage={
