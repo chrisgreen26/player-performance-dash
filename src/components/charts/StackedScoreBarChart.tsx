@@ -6,12 +6,17 @@ import {
   ATTACK_SCORE_COLOR,
   ATTACK_SCORE_STROKE,
   BASE_SCORE_COLOR,
+  BOOKMAKER_LINE_COLOR,
+  type ChartVariant,
   OPPONENT_ATTACK_SCORE_COLOR,
   OPPONENT_ATTACK_SCORE_STROKE,
   OPPONENT_BASE_SCORE_COLOR,
+  VARIANT_CARD_CLASSES,
+  VARIANT_LEGEND_CLASSES,
+  VARIANT_TITLE_CLASSES,
 } from "@/lib/constants";
 
-type Variant = "player" | "opponent";
+type Variant = ChartVariant;
 
 interface BarShapeProps {
   x?: number;
@@ -24,21 +29,6 @@ interface BarShapeProps {
 const VARIANT_COLORS: Record<Variant, { base: string; attack: string; attackStroke: string }> = {
   player: { base: BASE_SCORE_COLOR, attack: ATTACK_SCORE_COLOR, attackStroke: ATTACK_SCORE_STROKE },
   opponent: { base: OPPONENT_BASE_SCORE_COLOR, attack: OPPONENT_ATTACK_SCORE_COLOR, attackStroke: OPPONENT_ATTACK_SCORE_STROKE },
-};
-
-const VARIANT_CARD_CLASSES: Record<Variant, string> = {
-  player: "border-gray-200 bg-white dark:border-gray-800 dark:bg-gray-900",
-  opponent: "border-teal-300 bg-teal-50 dark:border-teal-800 dark:bg-teal-950/40",
-};
-
-const VARIANT_TITLE_CLASSES: Record<Variant, string> = {
-  player: "text-gray-800 dark:text-gray-100",
-  opponent: "text-teal-800 dark:text-teal-200",
-};
-
-const VARIANT_LEGEND_CLASSES: Record<Variant, string> = {
-  player: "text-gray-600 dark:text-gray-300",
-  opponent: "text-teal-700 dark:text-teal-300",
 };
 
 interface ScoreTooltipProps {
@@ -152,7 +142,7 @@ export function StackedScoreBarChart({
                 <YAxis tick={{ fontSize: 11 }} />
                 <Tooltip content={<ScoreTooltip teamAbbById={teamAbbById} colors={colors} />} />
                 {bookmakerLine !== undefined && (
-                  <ReferenceLine y={bookmakerLine} stroke="#f59e0b" strokeDasharray="6 4" strokeWidth={1.5} />
+                  <ReferenceLine y={bookmakerLine} stroke={BOOKMAKER_LINE_COLOR} strokeDasharray="6 4" strokeWidth={1.5} />
                 )}
                 <Bar dataKey="base" name="Base" stackId="score" fill={colors.base} isAnimationActive={false} />
                 <Bar

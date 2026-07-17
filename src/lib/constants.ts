@@ -40,6 +40,31 @@ export const OPPONENT_ATTACK_SCORE_STROKE = "#2dd4bf"; // teal-400
 export const REFERENCE_DATA_URL = "/data/reference.json";
 export const GAMES_DATA_URL = "/data/player-games.json";
 
+/** Player-vs-opponent card theming shared across chart components. */
+export type ChartVariant = "player" | "opponent";
+
+export const VARIANT_CARD_CLASSES: Record<ChartVariant, string> = {
+  player: "border-gray-200 bg-white dark:border-gray-800 dark:bg-gray-900",
+  opponent: "border-teal-300 bg-teal-50 dark:border-teal-800 dark:bg-teal-950/40",
+};
+
+export const VARIANT_TITLE_CLASSES: Record<ChartVariant, string> = {
+  player: "text-gray-800 dark:text-gray-100",
+  opponent: "text-teal-800 dark:text-teal-200",
+};
+
+export const VARIANT_LEGEND_CLASSES: Record<ChartVariant, string> = {
+  player: "text-gray-600 dark:text-gray-300",
+  opponent: "text-teal-700 dark:text-teal-300",
+};
+
+export const VARIANT_ACCENT_COLOR: Record<ChartVariant, string> = {
+  player: BASE_SCORE_COLOR,
+  opponent: OPPONENT_BASE_SCORE_COLOR,
+};
+
+export const BOOKMAKER_LINE_COLOR = "#f59e0b"; // amber-500
+
 /**
  * Clearance-rate gauge coloring. Thresholds are anchored to typical bookmaker
  * breakeven probability (e.g. $1.87 odds ≈ 53.5% breakeven): comfortably above

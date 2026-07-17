@@ -16,6 +16,7 @@ import { PlayerSelector } from "@/components/player/PlayerSelector";
 import { PlayerPanel } from "@/components/player/PlayerPanel";
 import { OpponentPanel } from "@/components/opponent/OpponentPanel";
 import { StackedScoreBarChart } from "@/components/charts/StackedScoreBarChart";
+import { ScoreDistributionChart } from "@/components/charts/ScoreDistributionChart";
 
 const EMPTY_GAMES: PlayerGameRow[] = [];
 const EMPTY_MAP = new Map<number, PlayerGameRow[]>();
@@ -44,8 +45,6 @@ export function DashboardClient() {
   const ready = dataState.status === "ready";
   const games = ready ? dataState.data.games : EMPTY_GAMES;
   const gamesByPlayer = ready ? dataState.data.gamesByPlayer : EMPTY_MAP;
-  // TODO: once the export script joins rl.lineups, this narrows to
-  // currently-relevant players instead of every player who's ever appeared.
   const allPlayers = ready ? dataState.data.reference.players : EMPTY_PLAYERS;
   const allTeams = ready ? dataState.data.reference.teams : EMPTY_TEAMS;
   const meta = ready ? dataState.data.reference.meta : FALLBACK_META;
@@ -151,32 +150,11 @@ export function DashboardClient() {
 
   return (
     <DashboardLayout
-      header={
-        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-          <h1 className="text-lg font-bold text-gray-900 dark:text-gray-50">Player Performance Dashboard</h1>
-          <div className="flex flex-wrap items-center gap-3">
-            <OpponentSelect
-              teams={teamsInCompetition}
-              value={filters.opponentTeamId}
-              onChange={(opponentTeamId) => handleFiltersChange({ opponentTeamId })}
-            />
-            <BookmakerLineInput
-              value={filters.bookmakerLine}
-              onChange={(bookmakerLine) => handleFiltersChange({ bookmakerLine })}
-            />
-            <button
-              type="button"
-              onClick={() => setFiltersOpen((o) => !o)}
-              className="rounded-md border border-gray-300 bg-white px-3 py-1.5 text-sm font-medium text-gray-700 hover:bg-gray-100 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-200 dark:hover:bg-gray-800"
-            >
-              Filters {filtersOpen ? "▴" : "▾"}
-            </button>
+      controls={
+        <div className="flex flex-wrap items-center gap-3">
+          <div className="w-full sm:w-72">
+            <PlayerSelector players={allPlayers} selectedPlayerId={filters.playerId} onSelect={handleSelectPlayer} />
           </div>
-        </div>
-      }
-      primarySelection={
-        <div className={`grid grid-cols-1 gap-4 ${hasPlayer ? "sm:grid-cols-2" : ""}`}>
-          <PlayerSelector players={allPlayers} selectedPlayerId={filters.playerId} onSelect={handleSelectPlayer} />
           {hasPlayer && (
             <PositionSelect
               options={availablePositions}
@@ -184,6 +162,22 @@ export function DashboardClient() {
               onChange={(position) => handleFiltersChange({ position })}
             />
           )}
+          <OpponentSelect
+            teams={teamsInCompetition}
+            value={filters.opponentTeamId}
+            onChange={(opponentTeamId) => handleFiltersChange({ opponentTeamId })}
+          />
+          <BookmakerLineInput
+            value={filters.bookmakerLine}
+            onChange={(bookmakerLine) => handleFiltersChange({ bookmakerLine })}
+          />
+          <button
+            type="button"
+            onClick={() => setFiltersOpen((o) => !o)}
+            className="rounded-md border border-gray-300 bg-white px-3 py-1.5 text-sm font-medium text-gray-700 hover:bg-gray-100 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-200 dark:hover:bg-gray-800"
+          >
+            Filters {filtersOpen ? "▴" : "▾"}
+          </button>
         </div>
       }
       filtersPanel={
@@ -192,6 +186,20 @@ export function DashboardClient() {
         ) : null
       }
     >
+      <section className="grid grid-cols-1 gap-4 lg:grid-cols-2">
+        <ScoreDistributionChart
+          scores={player.rows.map((r) => r.performanceScore)}
+          bookmakerLine={filters.bookmakerLine}
+          variant="player"
+          title="Score Distribution"
+        />
+        <ScoreDistributionChart
+          scores={opponent.rows.map((r) => r.performanceScore)}
+          bookmakerLine={filters.bookmakerLine}
+          variant="opponent"
+          title="Conceded Distribution"
+        />
+      </section>
       <DashboardSection
         panel={
           <PlayerPanel
